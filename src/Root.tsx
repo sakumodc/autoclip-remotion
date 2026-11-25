@@ -1,56 +1,42 @@
-import { Composition, Folder } from "remotion";
-import { HelloWorld } from "./HelloWorld";
-import { Logo } from "./HelloWorld/Logo";
-import { Title } from "./HelloWorld/Title";
+import React from 'react';
+import { Composition } from 'remotion';
+import { AutoClip, AutoClipSchema } from './AutoClip';
 
-// Each <Composition> is an entry in the sidebar!
+const FPS = 30;
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Folder name="Elements">
-        <Composition
-          id="Logo"
-          component={Logo}
-          durationInFrames={150}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{
-            logoColor1: "#91EAE4",
-            logoColor2: "#86A8E7",
-          }}
-        />
-        <Composition
-          id="Title"
-          component={Title}
-          durationInFrames={115}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{
-            titleText: "Welcome to Remotion",
-            titleColor: "#000000",
-          }}
-        />
-      </Folder>
       <Composition
-        // You can take the "id" to render a video:
-        // bunx remotion render HelloWorld
-        id="HelloWorld"
-        component={HelloWorld}
+        id="AutoClip"
+        component={AutoClip}
         durationInFrames={150}
-        fps={30}
-        width={1920}
-        height={1080}
-        // You can override these props for each render:
-        // https://www.remotion.dev/docs/parametrized-rendering
+        fps={FPS}
+        width={1080}
+        height={1920}
+        schema={AutoClipSchema}
         defaultProps={{
-          titleText: "Welcome to Remotion",
-          titleColor: "#000000",
+          videoSrc: 'sample.mp4',
+          hookTitle: 'Momen Paling Gila di Match Ini!',
+          durationInSeconds: 5,
+          highlightColor: '#FFE600',
+          words: [
+            { word: 'LIHAT', start: 0.2, end: 0.6 },
+            { word: 'PERGERAKAN', start: 0.65, end: 1.3 },
+            { word: 'INI', start: 1.35, end: 1.7 },
+            { word: 'SAMPAI', start: 1.8, end: 2.3 },
+            { word: 'HABIS', start: 2.35, end: 2.9 },
+          ],
+        }}
+        calculateMetadata={({ props }) => {
+          return {
+            durationInFrames: Math.max(
+              1,
+              Math.ceil(props.durationInSeconds * FPS)
+            ),
+          };
         }}
       />
-
     </>
   );
 };
