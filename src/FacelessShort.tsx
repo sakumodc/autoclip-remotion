@@ -2,169 +2,228 @@ import React from "react";
 import {
   AbsoluteFill,
   Audio,
-  OffthreadVideo,
-  useCurrentFrame,
-  useVideoConfig,
-  staticFile,
   interpolate,
   spring,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
+import { z } from "zod";
 
-export interface WordTiming {
-  text: string;
-  start: number;
-  end: number;
-}
+export const wordSchema = z.object({
+  text: z.string(),
+  start: z.number(),
+  end: z.number(),
+});
 
-export interface FacelessShortProps {
-  audioFile: string;
-  bgVideoFile: string;
-  topicHeader: string;
-  accentColor: string;
-  watermark: string;
-  words: WordTiming[];
-}
+export const facelessShortSchema = z.object({
+  audioFile: z.string(),
+  topicHeader: z.string(),
+  accentColor: z.string().default("#990000"),
+  watermark: z.string().default("MENSIUS"),
+  words: z.array(wordSchema),
+});
+
+export type FacelessShortProps = z.infer<typeof facelessShortSchema>;
 
 export const FacelessShort: React.FC<FacelessShortProps> = ({
   audioFile,
-  bgVideoFile,
   topicHeader,
   accentColor,
   watermark,
   words,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
   const currentTime = frame / fps;
 
-  // Cari kata aktif berdasarkan waktu saat ini
-  const activeIndex = words.findIndex(
-    (w) => currentTime >= w.start && currentTime <= w.end
-  );
-  const activeWord = activeIndex !== -1 ? words[activeIndex] : null;
-
-  // Animasi pop-in tiap kali kata berganti
-  const wordStartFrame = activeWord ? Math.floor(activeWord.start * fps) : 0;
-  const scale = activeWord
-    ? spring({
-        frame: frame - wordStartFrame,
-        fps,
-        config: { damping: 12, stiffness: 200 },
-      })
-    : 1;
-
-  // Progress bar di bagian atas layar
-  const totalDuration = words.length > 0 ? words[words.length - 1].end : 30;
-  const progressWidth = interpolate(
-    currentTime,
-    [0, totalDuration],
-    [0, 100],
+  // Animasi ambient background (pulse halus & pergeseran grid)
+  const pulse = Math.sin(frame / 25) * 0.15 + 0.85;
+  const gridOffset = (frame * 0.4) % 80;
+  const glowY = interpolate(
+    frame,
+    [0, durationInFrames],
+    [35, 65],
     { extrapolateRight: "clamp" }
   );
 
-  return (
-    <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
-      {/* Background Video (Gameplay / Dark Aesthetic Loop) */}
-      <OffthreadVideo
-        src={staticFile(bgVideoFile)}
-        muted
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          filter: "brightness(0.45) contrast(1.1)",
-        }}
-      />
+  // Progress bar bawah
+  const progress = interpolate(frame, [0, durationInFrames], [0, 100], {
+    extrapolateRight: "clamp",
+  });
 
-      {/* Audio Voiceover TTS */}
+  // Kelompokkan kata per 3 kata untuk chunk subtitle dinamis
+  const CHUNK_SIZE = 3;
+  const activeIndex = words.findIndex(
+    (w) => currentTime >= w.start && currentTime <= w.end
+  );
+  const fallbackIndex =
+    activeIndex !== -1
+      ? activeIndex
+      : words.reduce(
+          (acc, w, idx) => (currentTime >= w.start ? idx : acc),
+          0
+        );
+
+  const chunkStart = Math.floor(fallbackIndex / CHUNK_SIZE) * CHUNK_SIZE;
+  const currentChunk = words.slice(chunkStart, chunkStart + CHUNK_SIZE);
+
+  return (
+    <AbsoluteFill
+      style={{
+        backgroundColor: "#09090B",
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        color: "#F4F4F5",
+        overflow: "hidden",
+      }}
+    >
+      {/* Audio Voiceover */}
       <Audio src={staticFile(audioFile)} />
 
-      {/* Top Progress Bar */}
-      <div
+      {/* Layer 1: Subtle Architectural Grid */}
+      <AbsoluteFill
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          height: 10,
-          width: `${progressWidth}%`,
-          backgroundColor: accentColor,
+          backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+          backgroundSize: "80px 80px",
+          backgroundPosition: `${gridOffset}px ${gridOffset}px`,
         }}
       />
 
-      {/* Header Topik di Atas */}
+      {/* Layer 2: Ambient Crimson Radial Glow */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(circle at 50% ${glowY}%, ${accentColor}40 0%, rgba(9,9,11,0) 65%)`,
+          opacity: pulse,
+        }}
+      />
+
+      {/* Layer 3: Vignette Border */}
+      <AbsoluteFill
+        style={{
+          boxShadow: "inset 0 0 160px rgba(0,0,0,0.9)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Top Topic Header Pill */}
       <div
         style={{
           position: "absolute",
           top: 150,
           width: "100%",
           display: "flex",
-          justifyContent: "center",
-          padding: "0 50px",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "0 64px",
         }}
       >
         <div
           style={{
-            backgroundColor: "rgba(15, 15, 15, 0.85)",
-            borderLeft: `8px solid ${accentColor}`,
-            padding: "16px 28px",
-            borderRadius: 8,
-            color: "#FFFFFF",
-            fontSize: 36,
-            fontWeight: 800,
-            fontFamily: "sans-serif",
-            letterSpacing: 1,
+            borderLeft: `5px solid ${accentColor}`,
+            backgroundColor: "rgba(24, 24, 27, 0.85)",
+            padding: "16px 32px",
+            borderRadius: "4px",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
+            fontSize: 30,
+            fontWeight: 800,
+            color: "#FAFAFA",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
           }}
         >
           {topicHeader}
         </div>
       </div>
 
-      {/* Kinetic Word-by-Word Center Caption */}
-      {activeWord && (
-        <div
-          style={{
-            position: "absolute",
-            top: "46%",
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-            padding: "0 40px",
-            transform: `scale(${scale})`,
-          }}
-        >
-          <span
-            style={{
-              color: activeIndex % 3 === 0 ? accentColor : "#FFFFFF",
-              fontSize: 82,
-              fontWeight: 900,
-              fontFamily: "sans-serif",
-              textTransform: "uppercase",
-              textAlign: "center",
-              textShadow:
-                "0px 8px 24px rgba(0,0,0,0.95), -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000",
-            }}
-          >
-            {activeWord.text}
-          </span>
-        </div>
-      )}
-
-      {/* Watermark Branding */}
+      {/* Center Dynamic Word-by-Word Subtitle */}
       <div
         style={{
           position: "absolute",
-          bottom: 130,
+          top: "46%",
+          transform: "translateY(-50%)",
           width: "100%",
-          textAlign: "center",
-          color: "rgba(255, 255, 255, 0.65)",
-          fontSize: 26,
-          fontWeight: 700,
-          fontFamily: "sans-serif",
-          letterSpacing: 3,
+          padding: "0 72px",
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "18px",
         }}
       >
-        {watermark}
+        {currentChunk.map((w, idx) => {
+          const isCurrent =
+            currentTime >= w.start && currentTime <= w.end + 0.08;
+          const scale = isCurrent
+            ? spring({
+                frame: Math.max(0, frame - Math.floor(w.start * fps)),
+                fps,
+                config: { damping: 14, stiffness: 220 },
+              }) *
+                0.08 +
+              1
+            : 1;
+
+          return (
+            <span
+              key={`${chunkStart}-${idx}`}
+              style={{
+                fontSize: 68,
+                fontWeight: 900,
+                lineHeight: 1.2,
+                textTransform: "uppercase",
+                color: isCurrent ? "#FFFFFF" : "rgba(244, 244, 245, 0.45)",
+                backgroundColor: isCurrent ? accentColor : "transparent",
+                padding: isCurrent ? "4px 18px" : "4px 6px",
+                borderRadius: "8px",
+                transform: `scale(${scale})`,
+                textShadow: "0 6px 24px rgba(0,0,0,0.85)",
+              }}
+            >
+              {w.text}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Bottom Watermark & Progress Line */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 140,
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 20,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            letterSpacing: "0.28em",
+            color: "rgba(244, 244, 245, 0.45)",
+          }}
+        >
+          {watermark}
+        </div>
+        <div
+          style={{
+            width: 360,
+            height: 4,
+            backgroundColor: "rgba(255,255,255,0.12)",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${progress}%`,
+              height: "100%",
+              backgroundColor: accentColor,
+            }}
+          />
+        </div>
       </div>
     </AbsoluteFill>
   );
