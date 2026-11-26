@@ -1,16 +1,18 @@
 import React from "react";
 import { Composition } from "remotion";
-import { GameplayClip, GameplayClipProps } from "./GameplayClip";
+import { AutoClip, AutoClipProps } from "./AutoClip";
 import { FacelessShort, FacelessShortProps } from "./FacelessShort";
+
+const FPS = 30;
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition
         id="GameplayClip"
-        component={GameplayClip}
+        component={AutoClip}
         durationInFrames={900}
-        fps={30}
+        fps={FPS}
         width={1080}
         height={1920}
         defaultProps={{
@@ -18,13 +20,22 @@ export const RemotionRoot: React.FC = () => {
           hookTitle: "CONTOH JUDUL HOOK",
           watermark: "FRANKO STORE",
           words: [],
-        } satisfies GameplayClipProps}
+        } satisfies AutoClipProps}
+        calculateMetadata={({ props }) => {
+          const lastWordEnd =
+            props.words.length > 0
+              ? props.words[props.words.length - 1].end
+              : 30;
+          return {
+            durationInFrames: Math.max(1, Math.ceil((lastWordEnd + 1) * FPS)),
+          };
+        }}
       />
       <Composition
         id="FacelessShort"
         component={FacelessShort}
         durationInFrames={900}
-        fps={30}
+        fps={FPS}
         width={1080}
         height={1920}
         defaultProps={{
@@ -35,6 +46,15 @@ export const RemotionRoot: React.FC = () => {
           watermark: "FRANKO STUDIO",
           words: [],
         } satisfies FacelessShortProps}
+        calculateMetadata={({ props }) => {
+          const lastWordEnd =
+            props.words.length > 0
+              ? props.words[props.words.length - 1].end
+              : 30;
+          return {
+            durationInFrames: Math.max(1, Math.ceil((lastWordEnd + 1) * FPS)),
+          };
+        }}
       />
     </>
   );
